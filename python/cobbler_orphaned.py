@@ -3,9 +3,9 @@
 # $id: cobbler_orphaned.py,v 1.0.0 2017/10/30 14:01:02 mteixeir Exp $
 # Copyright (C) 2017
 #
-# Last Modified: 2017/10/31 15:16:44
+# Last Modified: 2017/10/31 15:20:31
 #
-# Helps finding orphaned distros in a Cobbler server.
+# Helps finding orphaned distros and profiles in a Cobbler server.
 
 import argparse
 import sys
