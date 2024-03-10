@@ -1,0 +1,121 @@
+- name: Install Pi-Hole with DNS over HTTPS (DoH)
+  hosts: all
+  gather_facts: false
+  become: true
+  handlers:
+    - name: Reboot
+      ansible.builtin.reboot:
+
+    - name: Restart cloudflared
+      ansible.builtin.service:
+        name: cloudflared
+        state: restarted
+
+  tasks:
+    - name: This host requires static IP and DNS
+      ansible.builtin.template:
+        src: templates/dhcpcd.conf
+        dest: /etc/dhcpcd.conf
+        mode: '0664'
+        owner: root
+        group: netdev
+      notify: Reboot
+
+    - name: Force handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Check if cloudfared is already started
+      ansible.builtin.service:
+        name: cloudflared
+        state: started
+      ignore_errors: true
+      register: service_cloudflared
+
+    - name: Check if pihole-FTL is already started
+      ansible.builtin.service:
+        name: pihole-FTL
+        state: started
+      ignore_errors: true
+      register: service_piholeftl
+
+    - name: If both services are already running, there's nothing else to do, exit here
+      ansible.builtin.meta: end_play
+      when:
+        - service_cloudflared.status["ActiveState"] == "active"
+        - service_piholeftl.status["ActiveState"] == "active"
+
+    - name: Add cloudfared repo GPG key
+      ansible.builtin.get_url:
+        url: https://pkg.cloudflare.com/cloudflare-main.gpg
+        dest: /usr/share/keyrings/cloudflare-main.gpg
+        mode: '0644'
+
+    - name: Add cloudflared repo itself
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main"
+        state: present
+
+    - name: Install cloudfared package
+      ansible.builtin.package:
+        name: cloudflared
+
+    - name: Add cloudflared user
+      ansible.builtin.user:
+        name: cloudflared
+        shell: /usr/sbin/nologin
+        system: true
+
+    - name: Create the cloudflared log file
+      ansible.builtin.file:
+        path: /var/log/cloudflared.log
+        state: touch
+        mode: '0644'
+        owner: cloudflared
+        group: cloudflared
+        modification_time: preserve
+        access_time: preserve
+
+    - name: Create cloudflared config file
+      ansible.builtin.template:
+        src: templates/cloudflared.conf
+        dest: /etc/default/cloudflared
+        mode: '0644'
+        owner: cloudflared
+        group: cloudflared
+      notify: Restart cloudflared
+
+    - name: Create cloudflared systemd unit
+      ansible.builtin.copy:
+        src: files/cloudflared.service
+        dest: /etc/systemd/system/cloudflared.service
+        mode: '0644'
+      notify: Restart cloudflared
+
+    - name: Start cloudflared service
+      ansible.builtin.service:
+        name: cloudflared
+        state: started
+        enabled: true
+
+    - name: Fetch the Pi-Hole installer script
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/pi-hole/pi-hole/master/automated%20install/basic-install.sh
+        dest: /root/pi-hole-basic-install.sh
+        mode: '0755'
+
+    - name: Create Pi-Hole config directory
+      ansible.builtin.file:
+        path: /etc/pihole
+        state: directory
+        mode: '0775'
+
+    - name: Land Pi-Hole setup variables
+      ansible.builtin.copy:
+        src: files/setupVars.conf
+        dest: /etc/pihole/setupVars.conf
+        mode: '0644'
+
+    - name: Install Pi-Hole unattended
+      ansible.builtin.command:
+        cmd: /root/pi-hole-basic-install.sh --unattended --reconfigure
+        creates: /etc/pihole/pihole-FTL.conf
