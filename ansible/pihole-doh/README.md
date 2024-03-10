@@ -1,5 +1,6 @@
 # Introduction
 This is a very basic Ansible playbook that helps install Pi-Hole with DNS over HTTPS (DoH) support.
+I'm using this to quickly configure a Raspberry Pi or a small VM with direct install (NOT containers).
 
 # Prerequisites
 - You accept using (OpenDNS)[https://support.opendns.com/hc/en-us] as your DoH provider.
