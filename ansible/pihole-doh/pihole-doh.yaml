@@ -1,6 +1,6 @@
 - name: Install Pi-Hole with DNS over HTTPS (DoH)
   hosts: all
-  gather_facts: false
+  gather_facts: true
   become: true
   handlers:
     - name: Reboot
@@ -12,13 +12,18 @@
         state: restarted
 
   tasks:
+    - name: Get system network information
+      ansible.builtin.set_fact:
+        network_interface: "{{ ansible_default_ipv4.interface }}"
+        network_gateway: "{{ ansible_default_ipv4.gateway }}"
+
     - name: This host requires static IP and DNS
       ansible.builtin.template:
         src: templates/dhcpcd.conf
         dest: /etc/dhcpcd.conf
         mode: '0664'
         owner: root
-        group: netdev
+        group: root
       notify: Reboot
 
     - name: Force handlers
@@ -41,19 +46,31 @@
     - name: If both services are already running, there's nothing else to do, exit here
       ansible.builtin.meta: end_play
       when:
-        - service_cloudflared.status["ActiveState"] == "active"
-        - service_piholeftl.status["ActiveState"] == "active"
+        - not service_cloudflared.failed and service_cloudflared.status["ActiveState"] == "active"
+        - not service_piholeftl.failed and service_piholeftl.status["ActiveState"] == "active"
 
-    - name: Add cloudfared repo GPG key
-      ansible.builtin.get_url:
-        url: https://pkg.cloudflare.com/cloudflare-main.gpg
-        dest: /usr/share/keyrings/cloudflare-main.gpg
-        mode: '0644'
+    - name: CloudflareD on Debian
+      when: ansible_distribution == "Debian"
+      block:
+        - name: (Debian) Add cloudfared repo GPG key
+          ansible.builtin.get_url:
+            url: https://pkg.cloudflare.com/cloudflare-main.gpg
+            dest: /usr/share/keyrings/cloudflare-main.gpg
+            mode: '0644'
 
-    - name: Add cloudflared repo itself
-      ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main"
-        state: present
+        - name: (Debian) Add cloudflared repo itself
+          ansible.builtin.apt_repository:
+            repo: "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared bookworm main"
+            state: present
+
+    - name: CloudflareD on Fedora
+      when: ansible_distribution == "Fedora"
+      block:
+        - name: (Fedora) Add cloudfared repo
+          ansible.builtin.get_url:
+            url: https://pkg.cloudflare.com/cloudflared-ascii.repo
+            dest: /etc/yum.repos.d/cloudflared.repo
+            mode: '0644'
 
     - name: Install cloudfared package
       ansible.builtin.package:
@@ -115,7 +132,23 @@
         dest: /etc/pihole/setupVars.conf
         mode: '0644'
 
+    - name: Inform when SELinux is enabled
+      when: ansible_selinux.status != "disabled"
+      ansible.builtin.pause:
+        prompt: "NOTE: SELinux is enabled on this system. This is NOT supported by Pi-Hole. Continue at your own risk"
+        seconds: 10
+
     - name: Install Pi-Hole unattended
+      environment:
+        PIHOLE_SELINUX: "true" # This is to workaround when SELinux is enabled
       ansible.builtin.command:
-        cmd: /root/pi-hole-basic-install.sh --unattended --reconfigure
+        cmd: /root/pi-hole-basic-install.sh --unattended
         creates: /etc/pihole/pihole-FTL.conf
+
+    - name: Fix SELinux file contexts (when enabled)
+      when: ansible_selinux.status != "disabled"
+      ansible.builtin.command:
+        cmd: restorecon -ir /var/www
+      register: restorecon
+      changed_when: restorecon.rc == 0
+      failed_when: restorecon.rc != 0
