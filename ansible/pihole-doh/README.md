@@ -5,10 +5,15 @@ I'm using this to quickly configure a Raspberry Pi or a small VM with direct ins
 # Prerequisites
 - You accept using (OpenDNS)[https://support.opendns.com/hc/en-us] as your DoH provider.
   - I may add othe providers later, just need time to test.
-- A host running with Debian, or a variant.
+- A host running Fedora or Debian (or a variant).
   - I may be able to support other distros later, just need time to test.
 - You can SSH without password.
 - You can SUDO without password.
+
+# Note about SELinux
+Pi-Hole does not support running on systems with SELinux enabled. This is accounted on my playbook
+by giving a warning and trying to do the bare minimum to get it running, but there are NO GUARANTEES.
+Run it with SELinux enabled at your own risk.
 
 # How to use
 - Clone this repository.
@@ -18,8 +23,6 @@ all:
   hosts:
     debian: <-- this is whatever you want to call your host
       ansible_host: 192.168.122.197 <-- this is the IP address of your host
-      network_gateway: 192.168.122.1 <-- this is your network router/default gateway
-      network_interface: enp1s0 <-- this is the host's network interface name
   vars:
     network_dns: 208.67.222.222 208.67.220.220
     doh_server: doh.opendns.com
