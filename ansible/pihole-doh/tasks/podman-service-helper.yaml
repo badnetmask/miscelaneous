@@ -1,0 +1,18 @@
+
+- name: Create and start {{ container_name }} container
+  containers.podman.podman_container:
+    name: "{{ container_name }}"
+    image: "{{ container_image }}"
+
+- name: Generate systemd unit file for {{ container_name }} container
+  containers.podman.podman_generate_systemd:
+    name: "{{ container_name }}"
+    no_header: true
+    dest: /etc/systemd/system
+
+- name: Ensure {{ container_name }} container is started and enabled
+  ansible.builtin.systemd:
+    name: container-{{ container_name }}
+    daemon_reload: true
+    state: started
+    enabled: true

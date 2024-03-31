@@ -7,3 +7,4 @@ all:
   vars:
     network_dns: 208.67.222.222 208.67.220.220
     doh_server: doh.opendns.com
+    pihole_containers: true

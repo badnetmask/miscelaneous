@@ -1,0 +1,22 @@
+- name: (Debian) Install Podman
+  when: ansible_distribution == "Debian"
+  ansible.builtin.apt:
+    name: podman
+    update_cache: yes
+
+- name: (Fedora) Install Podman
+  when: ansible_distribution == "Fedora"
+  ansible.builtin.package:
+    name: podman
+
+- name: Mark Podman to always start
+  ansible.builtin.service:
+    name: podman
+    state: started
+    enabled: true
+
+- name: Install cloudflared via Podman service helper tasks
+  ansible.builtin.include_tasks: podman-service-helper.yaml
+  vars:
+    container_name: cloudflared
+    container_image: docker.io/cloudflare/cloudflared
