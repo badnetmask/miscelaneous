@@ -44,10 +44,11 @@
       register: service_piholeftl
 
     - name: If both services are already running, there's nothing else to do, exit here
-      ansible.builtin.meta: end_play
+      ansible.builtin.meta: end_host
       when:
         - not service_cloudflared.failed and service_cloudflared.status["ActiveState"] == "active"
         - not service_piholeftl.failed and service_piholeftl.status["ActiveState"] == "active"
+      run_once: false
 
     - name: CloudflareD on Debian
       when: ansible_distribution == "Debian"
@@ -134,9 +135,13 @@
 
     - name: Inform when SELinux is enabled
       when: ansible_selinux.status != "disabled"
-      ansible.builtin.pause:
-        prompt: "NOTE: SELinux is enabled on this system. This is NOT supported by Pi-Hole. Continue at your own risk"
-        seconds: 10
+      block:
+        - name: Display notice about SELinux
+          ansible.builtin.debug:
+            msg: "NOTE: SELinux is enabled on {{ inventory_hostname }}. This is NOT supported by Pi-Hole. Continue at your own risk!"
+        - name: Pause for 10 seconds (you can CTRL+C if you want)
+          ansible.builtin.wait_for:
+            timeout: 10
 
     - name: Install Pi-Hole unattended
       environment:
@@ -152,3 +157,9 @@
       register: restorecon
       changed_when: restorecon.rc == 0
       failed_when: restorecon.rc != 0
+
+    - name: Make sure pihole-FTL service will always start
+      ansible.builtin.service:
+        name: pihole-FTL
+        state: started
+        enabled: true
