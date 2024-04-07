@@ -1,0 +1,11 @@
+- hosts: all
+  gather_facts: false
+  tasks:
+    - name: Test ping
+      ansible.builtin.ping:
+      register: result
+
+    - name: Print ping result
+      ansible.builtin.debug:
+        msg: "{{ result }}"
+

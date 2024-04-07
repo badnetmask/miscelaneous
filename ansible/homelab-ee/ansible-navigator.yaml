@@ -1,0 +1,23 @@
+---
+ansible-navigator:
+  logging:
+    level: critical
+  mode: stdout
+  playbook-artifact:
+    enable: false
+  execution-environment:
+    # use my locally built image, that contains all my deps
+    image: homelab-ee
+    pull:
+      # don't try to pull my image, since it's already local
+      policy: never
+    environment-variables:
+      pass:
+        # Bitwarden CLI session variable
+        - BW_SESSION
+    volume-mounts:
+      # this way I can authenticate outside the container
+      - src: "/home/badnetmask/.config/Bitwarden\ CLI"
+        dest: "/root/.config/Bitwarden\ CLI"
+        options: "Z"
+

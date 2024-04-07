@@ -1,0 +1,31 @@
+---
+version: 3
+images:
+  base_image:
+    name: quay.io/fedora/fedora:latest
+dependencies:
+  ansible_core:
+    package_pip: ansible-core==2.16.5
+  ansible_runner:
+    package_pip: ansible-runner
+  system:
+    - openssh-clients
+    - sshpass
+  galaxy:
+    collections:
+      - name: community.general
+      - name: ansible.posix
+additional_build_files:
+  - src: /etc/pki/ca-trust/source/anchors/homelab-ca.crt
+    dest: files
+additional_build_steps:
+  prepend_builder:
+    - WORKDIR _build/files
+    - ADD https://vault.bitwarden.com/download/?app=cli&platform=linux bw.zip
+    - RUN gunzip -S .zip bw.zip
+  append_final:
+    - COPY _build/files/bw /usr/local/bin/
+    - RUN chmod 0755 /usr/local/bin/bw
+    - COPY _build/files/homelab-ca.crt /etc/pki/ca-trust/source/anchors/
+    - RUN update-ca-trust
+
